@@ -4,7 +4,7 @@ use bytes::{Buf, Bytes};
 use crate::code::Code;
 use crate::constant::Constant;
 use crate::error::{Error, Result};
-use crate::interp::Interp;
+use crate::interp::{Interp, InterpContext};
 use crate::value::{Object, Type, Value};
 
 #[derive(Debug)]
@@ -93,8 +93,8 @@ impl Class {
         &self.name
     }
 
-    pub fn superclass(&self, interp: &Interp) -> Arc<Class> {
-        interp.class(&self.superclass_name).unwrap()
+    pub fn superclass(&self, context: &InterpContext) -> Arc<Class> {
+        context.class(&self.superclass_name).unwrap()
     }
 
     pub fn methods(&self) -> &[Method] {

@@ -1,9 +1,10 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 use crate::class::{Class, Method};
 use crate::code::Instr;
 use crate::constant::Constant;
-use crate::error::Result;
-use crate::interp::Interp;
+use crate::error::{Error, Result};
+use crate::interp::InterpContext;
 use crate::value::Value;
 
 pub struct Thread {
@@ -31,7 +32,7 @@ impl Thread {
         &self.pc.class.methods()[self.pc.method_index]
     }
 
-    pub fn exec_one(&mut self, interp: &mut Interp) -> Result<()> {
+    pub fn exec_one(&mut self, context: &mut InterpContext) -> Result<()> {
         let instr = self.method().code().unwrap().code[self.pc.instr].clone();
         let class = self.pc.class.clone();
         let frame = self.current_frame();
@@ -137,7 +138,9 @@ impl Thread {
                     panic!("Invalid constant")
                 };
 
-                let class = interp.class(name).unwrap();
+                let Some(class) = context.class(name) else {
+                    return Err(Error::ClassNotFound);
+                };
                 let field_index = class.static_field_index(name, descriptor.as_ref()).unwrap();
                 let value = class.static_field_value(field_index).unwrap();
 
