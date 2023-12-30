@@ -139,6 +139,7 @@ impl Thread {
                 };
 
                 let Some(class) = context.class(name) else {
+                    eprintln!("Class not found: name: {name}, descriptor: {descriptor}");
                     return Err(Error::ClassNotFound);
                 };
                 let field_index = class.static_field_index(name, descriptor.as_ref()).unwrap();
