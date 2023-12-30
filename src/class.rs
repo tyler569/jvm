@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::sync::{Arc, Condvar, Mutex};
 use bitflags::{bitflags, Flags};
 use bytes::{Buf, Bytes};
@@ -15,7 +16,7 @@ pub struct Class {
     pub constant_pool: Vec<Constant>,
 
     pub static_fields: Vec<Field>,
-    pub static_values: Vec<Value>,
+    pub static_values: Vec<RefCell<Value>>,
     pub static_methods: Vec<Method>,
 
     pub fields: Vec<Field>,
@@ -25,6 +26,18 @@ pub struct Class {
     pub attributes: Vec<Attribute>,
 
     pub monitor: (Mutex<()>, Condvar),
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum MethodIndex {
+    Dynamic(usize),
+    Static(usize),
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum FieldIndex {
+    Dynamic(usize),
+    Static(usize),
 }
 
 impl Class {
@@ -56,7 +69,7 @@ impl Class {
             .filter(|field| field.access.contains(FieldAccessFlags::Static))
             .cloned()
             .collect::<Vec<_>>();
-        let static_values = vec![Value::Int(0); static_fields.len()];
+        let static_values = vec![RefCell::new(Value::Int(0)); static_fields.len()];
         let static_methods = all_methods.iter()
             .filter(|method| method.access.contains(MethodAccessFlags::Static))
             .cloned()
@@ -97,8 +110,11 @@ impl Class {
         context.class(&self.superclass_name).unwrap()
     }
 
-    pub fn methods(&self) -> &[Method] {
-        &self.methods
+    pub fn method(&self, index: MethodIndex) -> &Method {
+        match index {
+            MethodIndex::Dynamic(index) => &self.methods[index],
+            MethodIndex::Static(index) => &self.static_methods[index],
+        }
     }
 
     pub fn wait(&self) {
@@ -109,32 +125,36 @@ impl Class {
         self.monitor.1.notify_one();
     }
 
-    pub fn method_index(&self, name: &str, descriptor: &str) -> Option<usize> {
+    pub fn method_index(&self, name: &str, descriptor: &str) -> Option<MethodIndex> {
         self.methods.iter().position(|method|
             method.name.as_ref() == name && method.descriptor.as_ref() == descriptor
-        )
+        ).map(MethodIndex::Dynamic)
     }
 
-    pub fn static_method_index(&self, name: &str, descriptor: &str) -> Option<usize> {
+    pub fn static_method_index(&self, name: &str, descriptor: &str) -> Option<MethodIndex> {
         self.static_methods.iter().position(|method|
             method.name.as_ref() == name && method.descriptor.as_ref() == descriptor
-        )
+        ).map(MethodIndex::Static)
     }
 
-    pub fn field_index(&self, name: &str, descriptor: &str) -> Option<usize> {
+    pub fn field_index(&self, name: &str, descriptor: &str) -> Option<FieldIndex> {
         self.fields.iter().position(|field|
             field.name.as_ref() == name && field.typ.as_ref() == descriptor
-        )
+        ).map(FieldIndex::Dynamic)
     }
 
-    pub fn static_field_index(&self, name: &str, descriptor: &str) -> Option<usize> {
+    pub fn static_field_index(&self, name: &str, descriptor: &str) -> Option<FieldIndex> {
         self.static_fields.iter().position(|field|
             field.name.as_ref() == name && field.typ.as_ref() == descriptor
-        )
+        ).map(FieldIndex::Static)
     }
 
-    pub fn static_field_value(&self, index: usize) -> Option<Value> {
-        self.static_values.get(index).cloned()
+    pub fn static_field_value(&self, index: FieldIndex) -> Option<Value> {
+        match index {
+            FieldIndex::Static(index) =>
+                self.static_values.get(index).map(|p| p.borrow().clone()),
+            _ => panic!(),
+        }
     }
 
     pub fn static_field_value_name(&self, name: &str, descriptor: &str) -> Option<Value> {
@@ -142,8 +162,11 @@ impl Class {
         self.static_field_value(index)
     }
 
-    pub fn set_static_field_value(&mut self, index: usize, value: Value) {
-        self.static_values[index] = value;
+    pub fn set_static_field_value(&mut self, index: FieldIndex, value: Value) {
+        match index {
+            FieldIndex::Static(index) => self.static_values[index].replace(value),
+            _ => panic!(),
+        };
     }
 
     pub fn set_static_field_value_name(&mut self, name: &str, descriptor: &str, value: Value) {

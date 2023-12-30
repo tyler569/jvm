@@ -74,7 +74,7 @@ impl Interp {
     pub fn run(&mut self) -> Result<()> {
         loop {
             for thread in self.threads.iter_mut() {
-                thread.exec_one(&mut self.context);
+                thread.exec_one(&mut self.context)?;
             }
         }
     }

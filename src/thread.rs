@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use crate::class::{Class, Method};
+use crate::class::{Class, FieldIndex, Method, MethodIndex};
 use crate::code::Instr;
 use crate::constant::Constant;
 use crate::error::{Error, Result};
@@ -13,7 +13,7 @@ pub struct Thread {
 }
 
 impl Thread {
-    pub fn new(class: Arc<Class>, method_index: usize) -> Self {
+    pub fn new(class: Arc<Class>, method_index: MethodIndex) -> Self {
         let pc = Pc::new(class.clone(), method_index);
         let frame = Frame::for_method(class.clone(), method_index);
         let stack = vec![frame];
@@ -29,7 +29,7 @@ impl Thread {
     }
 
     pub fn method(&self) -> &Method {
-        &self.pc.class.methods()[self.pc.method_index]
+        &self.pc.class.method(self.pc.method_index)
     }
 
     pub fn exec_one(&mut self, context: &mut InterpContext) -> Result<()> {
@@ -273,12 +273,12 @@ impl Thread {
 
 pub struct Pc {
     class: Arc<Class>,
-    method_index: usize,
+    method_index: MethodIndex,
     instr: usize,
 }
 
 impl Pc {
-    pub fn new(class: Arc<Class>, method_index: usize) -> Self {
+    pub fn new(class: Arc<Class>, method_index: MethodIndex) -> Self {
         Self {
             class,
             method_index,
@@ -304,8 +304,8 @@ pub struct Frame {
 }
 
 impl Frame {
-    pub fn for_method(class: Arc<Class>, method_index: usize) -> Self {
-        let method = &class.methods()[method_index];
+    pub fn for_method(class: Arc<Class>, method_index: MethodIndex) -> Self {
+        let method = class.method(method_index);
         if !method.has_code() {
             panic!("Method has no code");
         }
@@ -335,8 +335,8 @@ impl Frame {
         self.stack.pop().unwrap()
     }
 
-    pub fn new(return_pc: Pc, call_class: Arc<Class>, call_method: usize) -> Self {
-        let method = &call_class.methods()[call_method];
+    pub fn new(return_pc: Pc, call_class: Arc<Class>, call_method: MethodIndex) -> Self {
+        let method = call_class.method(call_method);
         if !method.has_code() {
             panic!("Method has no code");
         }
