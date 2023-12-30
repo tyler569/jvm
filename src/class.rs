@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::sync::{Arc, Condvar, Mutex};
+use std::task::Context;
 use bitflags::{bitflags, Flags};
 use bytes::{Buf, Bytes};
 use crate::code::Code;
@@ -179,6 +180,31 @@ impl Class {
             return None
         }
         self.constant_pool.get(n - 1)
+    }
+
+    pub fn get_static_from_constant(&self, context: &InterpContext, constant_index: usize) -> Result<Value> {
+        let Some(Constant::FieldRef { class_index, name_and_type_index }) = self.constant(constant_index) else {
+            return Err(Error::InvalidClass)
+        };
+        let Some(Constant::Class { name_index }) = self.constant(*class_index as usize) else {
+            return Err(Error::InvalidClass)
+        };
+        let Some(Constant::NameAndType { name_index, descriptor_index }) = self.constant(*name_and_type_index as usize) else {
+            return Err(Error::InvalidClass)
+        };
+        let Some(Constant::Utf8(name)) = self.constant(*name_index as usize) else {
+            return Err(Error::InvalidClass)
+        };
+        let Some(Constant::Utf8(descriptor)) = self.constant(*descriptor_index as usize) else {
+            return Err(Error::InvalidClass)
+        };
+
+        let Some(class) = context.class(name) else {
+            eprintln!("Class not found: name: {name}, descriptor: {descriptor}");
+            return Err(Error::ClassNotFound);
+        };
+        let field_index = class.static_field_index(name, descriptor.as_ref()).unwrap();
+        Ok(class.static_field_value(field_index).unwrap())
     }
 }
 

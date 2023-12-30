@@ -122,31 +122,9 @@ impl Thread {
             Instr::Fsub => todo!(),
             Instr::Getfield(_) => todo!(),
             Instr::Getstatic(n) => {
-                let Some(Constant::FieldRef { class_index, name_and_type_index }) = class.constant(n as usize) else {
-                    panic!("Invalid constant")
-                };
-                let Some(Constant::Class { name_index }) = class.constant(*class_index as usize) else {
-                    panic!("Invalid constant")
-                };
-                let Some(Constant::NameAndType { name_index, descriptor_index }) = class.constant(*name_and_type_index as usize) else {
-                    panic!("Invalid constant")
-                };
-                let Some(Constant::Utf8(name)) = class.constant(*name_index as usize) else {
-                    panic!("Invalid constant")
-                };
-                let Some(Constant::Utf8(descriptor)) = class.constant(*descriptor_index as usize) else {
-                    panic!("Invalid constant")
-                };
-
-                let Some(class) = context.class(name) else {
-                    eprintln!("Class not found: name: {name}, descriptor: {descriptor}");
-                    return Err(Error::ClassNotFound);
-                };
-                let field_index = class.static_field_index(name, descriptor.as_ref()).unwrap();
-                let value = class.static_field_value(field_index).unwrap();
-
+                let value = class.get_static_from_constant(context, n.into())?;
                 frame.stack.push(value);
-            },
+            }
             Instr::Goto(_) => todo!(),
             Instr::GotoW(_) => todo!(),
             Instr::I2b => todo!(),
